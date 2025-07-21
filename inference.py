@@ -42,6 +42,7 @@ def load_video(
     video_reader = decord.VideoReader(path)
     video_length = len(video_reader)
     ori_fps = video_reader.get_avg_fps()
+    print(f"ori_fps: {ori_fps}")
     normed_video_length = max(round(video_length / ori_fps * fps), num_frames)
     batch_index_all = np.linspace(0, video_length - 1, normed_video_length).round().astype(int).tolist()
     batch_index = batch_index_all[start_index:start_index + num_frames]
@@ -63,6 +64,7 @@ def main():
     parser.add_argument('--ckpt', type=str, default="./pretrained_models", help='Path to checkpoint folder.')
     parser.add_argument('--max-res', type=int, default=768 * 768, help='Resolution of the generated video.')
     parser.add_argument('--num-frames', type=int, default=81, help='Number of the generated video frames.')
+    parser.add_argument('--fps', type=int, default=16, help='FPS of the generated video.')
     parser.add_argument('--seed', type=int, default=1024, help='The generation seed.')
     parser.add_argument('--save-gpu-memory', action='store_true', help='Save GPU memory, but will be super slow.')
     parser.add_argument(
@@ -88,6 +90,7 @@ def main():
     save_gpu_memory = args.save_gpu_memory
     multi_gpu = args.multi_gpu
     enable_teacache = args.enable_teacache
+    fps = args.fps
     os.makedirs(save_dir, exist_ok=True)
 
     # check args
@@ -120,6 +123,9 @@ def main():
     else:
         pipe.enable_model_cpu_offload()
 
+    # negative_prompt = "细节模糊不清，字幕，作品，画作，画面，静止，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，杂乱的背景，三条腿，背景人很多，倒着走"
+    negative_prompt = ""
+
     # inference
     if root is not None:  # batch inference
         for ref_path in glob.glob(os.path.join(root, "ref", "*")):
@@ -139,40 +145,49 @@ def main():
                 for l in file.readlines():
                     prompt += l.strip()
 
+            
             # prepare inputs, inference, and save
             ref_image = load_image(ref_path)
-            smpl = load_video(smpl_path, num_frames=num_frames)
-            hamer = load_video(hamer_path, num_frames=num_frames)
+            smpl = load_video(smpl_path, fps=fps, num_frames=num_frames)
+            hamer = load_video(hamer_path, fps=fps, num_frames=num_frames)
             output = pipe(
                 image=ref_image,
+                num_frames=num_frames,
                 smpl=smpl,
                 hamer=hamer,
                 prompt=prompt,
+                negative_prompt=negative_prompt,
                 max_resolution=max_res,
                 enable_teacache=enable_teacache,
             ).frames[0]
             if is_main_process():
-                export_to_video(output, output_path, fps=16)
+                export_to_video(output, output_path, fps=fps)
     else:  # single sample inference
         # path process
+        print("single sample inference")
         vid = os.path.splitext(os.path.basename(ref_path))[0]
         pose_id = os.path.splitext(os.path.basename(smpl_path))[0]
         output_path = os.path.join(save_dir, f"{vid}_{pose_id}.mp4")
 
         # prepare inputs, inference, and save
         ref_image = load_image(ref_path)
-        smpl = load_video(smpl_path, num_frames=num_frames)
-        hamer = load_video(hamer_path, num_frames=num_frames)
+        print(f"ref_image shape: {ref_image.shape}")
+        smpl = load_video(smpl_path, fps=fps, num_frames=num_frames)
+        print(f"smpl shape: {smpl.shape}")
+        hamer = load_video(hamer_path, fps=fps, num_frames=num_frames)
+        print(f"hamer shape: {hamer.shape}")
         output = pipe(
             image=ref_image,
+            num_frames=num_frames,
             smpl=smpl,
             hamer=hamer,
             prompt=prompt,
+            negative_prompt=negative_prompt,
             max_resolution=max_res,
             enable_teacache=enable_teacache,
         ).frames[0]
         if is_main_process():
-            export_to_video(output, output_path, fps=16)
+            export_to_video(output, output_path, fps=fps)
 
 
 if __name__ == "__main__":
