@@ -29,3 +29,4 @@ venv.bak/
 /output_*/
 /output/
 /pretrained_models/
+/__assets__/
