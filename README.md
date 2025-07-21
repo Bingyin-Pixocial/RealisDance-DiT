@@ -59,7 +59,7 @@ Please make sure the structure of './pretrained_models' is consistent with the o
 |---model_index.json
 ```
 
-### 3. Pose prepration###
+### 3. Pose prepration
 Follow the instruction [here](https://github.com/Bingyin-Pixocial/Pose-Hand-Estimation), including the prepration of pretrained_models metioned in that repo.
 
 ### 4. Quick Inference
